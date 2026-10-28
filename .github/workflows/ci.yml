@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Exécuter les tests unitaires
+      - name: Run Tests
         run: mvn test
 
   scan-image:
@@ -60,7 +60,7 @@ jobs:
           name: webapp-war
           path: webapp/target
 
-      - name: Construire l'image Docker
+      - name: Build Image
         run: |
           docker build -t "$IMAGE:$SHORT_SHA" .
 
