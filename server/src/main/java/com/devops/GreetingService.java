@@ -3,7 +3,7 @@ package com.devops;
 public class GreetingService {
 
     public String greet(String name) {
-        return "Bravo ! Application déployée avec succès.";
+        return "Bravo depuis github actions ! Application déployée avec succès.";
     }
 
     public String getVersion() {
