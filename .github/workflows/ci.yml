@@ -54,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Récupérer le WAR
+      - name: Get war artifact
         uses: actions/download-artifact@v4
         with:
           name: webapp-war
@@ -104,8 +104,7 @@ jobs:
         run: |
           docker load -i "$RUNNER_TEMP/image.tar"
           docker tag "$IMAGE:$SHORT_SHA" "$IMAGE:latest"
-          docker push "$IMAGE:$SHORT_SHA"
-          docker push "$IMAGE:latest"
+          docker push "$IMAGE:$SHORT_SHA" "$IMAGE:latest"
 
   update-manifest:
     needs: [build, push-image]

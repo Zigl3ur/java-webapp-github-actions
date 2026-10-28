@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: java-demo-appweb
+  name: java-demo-appweb-github
   namespace: default
   labels:
-    app: java-demo-appweb
+    app: java-demo-appweb-github
 spec:
   containers:
     - name: java-demo-appweb
