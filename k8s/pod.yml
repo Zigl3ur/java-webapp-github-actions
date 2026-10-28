@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: java-demo-appweb
+  namespace: default
+  labels:
+    app: java-demo-appweb
+spec:
+  containers:
+    - name: java-demo-appweb
+      image: registry.gitlab.com/zigl3ur/java-demo-appweb-gitlabci:latest
+      ports:
+        - containerPort: 8080

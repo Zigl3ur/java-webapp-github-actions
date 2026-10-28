@@ -1,0 +1,130 @@
+name: CI CD
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: maven:3.9.4-eclipse-temurin-21
+    outputs:
+      image: ${{ steps.metadata.outputs.image }}
+      short-sha: ${{ steps.metadata.outputs.short-sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image metadata
+        id: metadata
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "short-sha=${GITHUB_SHA:0:8}" >> "$GITHUB_OUTPUT"
+
+      - name: Build App
+        run: mvn clean package -DskipTests
+
+      - name:
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-war
+          path: webapp/target/webapp.war
+          if-no-files-found: error
+
+  unit-test:
+    needs: build
+    runs-on: ubuntu-24.04
+    container: maven:3.9.4-eclipse-temurin-21
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exécuter les tests unitaires
+        run: mvn test
+
+  scan-image:
+    needs: [build, unit-test]
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE: ${{ needs.build.outputs.image }}
+      SHORT_SHA: ${{ needs.build.outputs.short-sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Récupérer le WAR
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-war
+          path: webapp/target
+
+      - name: Construire l'image Docker
+        run: |
+          docker build -t "$IMAGE:$SHORT_SHA" .
+
+      - name: Scan Image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ env.SHORT_SHA }}
+          cache-dir: .trivycache
+
+      - name: Save image to tar
+        run: docker save "$IMAGE:$SHORT_SHA" -o "$RUNNER_TEMP/image.tar"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanned-image
+          path: ${{ runner.temp }}/image.tar
+
+  push-image:
+    needs: [build, scan-image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ${{ needs.build.outputs.image }}
+      SHORT_SHA: ${{ needs.build.outputs.short-sha }}
+    steps:
+      - name: Get image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: scanned-image
+          path: ${{ runner.temp }}
+
+      - name: Login to ghcr.io
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push image to ghcr.io
+        run: |
+          docker load -i "$RUNNER_TEMP/image.tar"
+          docker tag "$IMAGE:$SHORT_SHA" "$IMAGE:latest"
+          docker push "$IMAGE:$SHORT_SHA"
+          docker push "$IMAGE:latest"
+
+  update-manifest:
+    needs: [build, push-image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      IMAGE: ${{ needs.build.outputs.image }}
+      SHORT_SHA: ${{ needs.build.outputs.short-sha }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Update manifest
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          sed -i "s|^\([[:space:]]*image: \).*|\1${IMAGE}:${SHORT_SHA}|" k8s/pod.yml
+          git add k8s/pod.yml
+          git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
+          git push origin "HEAD:$DEFAULT_BRANCH"
