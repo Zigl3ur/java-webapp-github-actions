@@ -20,6 +20,7 @@ jobs:
 
       - name: Set image metadata
         id: metadata
+        shell: bash
         run: |
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           echo "short-sha=${GITHUB_SHA:0:8}" >> "$GITHUB_OUTPUT"
