@@ -8,6 +8,6 @@ metadata:
 spec:
   containers:
     - name: java-demo-appweb
-      image: ghcr.io/zigl3ur/java-webapp-github-actions:8b6870db
+      image: ghcr.io/zigl3ur/java-webapp-github-actions:f754ffe1
       ports:
         - containerPort: 8080
